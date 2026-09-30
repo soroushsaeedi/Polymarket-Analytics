@@ -4,8 +4,8 @@ import json
 GAMMA_URL = "https://gamma-api.polymarket.com"
 CLOB_URL = "https://clob.polymarket.com" 
 
-def fetch_closed_markets(limit=5):
-    params = {"closed": "true", "limit": limit, "order": "volumeNum", "ascending": "false"}
+def fetch_closed_markets(limit=100, offset=0):
+    params = {"closed": "true", "limit": limit, "offset": offset, "order": "volumeNum", "ascending": "false"}
     resp = requests.get(f"{GAMMA_URL}/markets", params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
