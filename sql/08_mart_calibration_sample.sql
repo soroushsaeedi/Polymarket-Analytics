@@ -3,13 +3,13 @@ GO
 
 CREATE OR ALTER VIEW mart.calibration_sample AS
 WITH one_per_event AS (
-    SELECT market_id, closed_at, yes_won,
+    SELECT market_id, closed_at, yes_won, volume_usd,
            ROW_NUMBER() OVER (PARTITION BY COALESCE(event_id, market_id)
                               ORDER BY volume_usd DESC) AS rn
     FROM core.dim_market
     WHERE yes_won IS NOT NULL AND closed_at IS NOT NULL
 )
-SELECT m.market_id, m.closed_at, m.yes_won, p.price_date, p.yes_price
+SELECT m.market_id, m.closed_at, m.yes_won, m.volume_usd, p.price_date, p.yes_price
 FROM one_per_event m
 CROSS APPLY (
     SELECT TOP (1) f.price_date, f.yes_price

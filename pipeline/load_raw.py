@@ -1,16 +1,22 @@
 import json
 import time
+import requests
+import sys
 
 from pipeline.api import fetch_closed_markets, fetch_price_history
-from pipeline.api import fetch_closed_markets
 from pipeline.db import connect
 
-def load_markets(pages=20, page_size=100):
+def load_markets(max_volume=None, pages=20, page_size=100):
     conn = connect()
     cursor = conn.cursor()
+    if max_volume is None:
+        max_volume = cursor.execute(
+            "SELECT MIN(TRY_CAST(JSON_VALUE(payload, '$.volumeNum') AS FLOAT)) FROM raw.markets"
+        ).fetchval()
+    print("loading markets below volume", max_volume)
     total = 0
     for page in range(pages):
-        markets = fetch_closed_markets(limit=page_size, offset=page * page_size)
+        markets = fetch_closed_markets(limit=page_size, offset=page * page_size, max_volume=max_volume)
         if not markets:
             break
         cursor.executemany(
@@ -32,6 +38,7 @@ def load_price_histories():
         "SELECT DISTINCT market_id, JSON_VALUE(payload, '$.clobTokenIds') "
         "FROM raw.markets "
         "WHERE JSON_VALUE(payload, '$.clobTokenIds') IS NOT NULL "
+        "AND JSON_VALUE(JSON_VALUE(payload, '$.outcomes'), '$[0]') = 'Yes' "
         "AND market_id NOT IN (SELECT market_id FROM raw.price_history)"
     ).fetchall()
 
@@ -39,7 +46,7 @@ def load_price_histories():
         yes_token = json.loads(token_ids)[0]
         try:
             history = fetch_price_history(yes_token)
-        except requests.HTTPError as e:
+        except requests.RequestException as e:
             print(f"skipped {market_id}: {e}")
             continue
         cursor.execute(
@@ -56,5 +63,6 @@ def load_price_histories():
 
 
 if __name__ == "__main__":
-    print(load_markets(), "markets loaded")
+    max_volume = float(sys.argv[1]) if len(sys.argv) > 1 else None
+    print(load_markets(max_volume), "markets loaded")
     print(load_price_histories(), "price histories loaded")
